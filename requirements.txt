@@ -3,4 +3,5 @@ peft
 diffusers
 transformers
 safetensors
+torchao>=0.17.0
 torchvision

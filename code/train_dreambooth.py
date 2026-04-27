@@ -1,4 +1,4 @@
-"""Train DreamBooth LoRA weights for Stable Diffusion.
+"""Train DreamBooth weights for Stable Diffusion.
 
 Example:
     accelerate launch code/train_dreambooth.py \
@@ -13,8 +13,9 @@ Example:
 This script follows the DreamBooth objective:
     loss = reconstruction_loss + prior_loss_weight * prior_preservation_loss
 
-Only LoRA adapters on the UNet attention layers are trained; the VAE, text
-encoder, and base UNet weights are kept frozen.
+By default, only LoRA adapters on the UNet attention layers are trained. Pass
+--no_lora to fine-tune the full UNet instead. The VAE and text encoder are kept
+frozen in both modes.
 """
 
 from __future__ import annotations
@@ -47,7 +48,7 @@ IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Fine-tune Stable Diffusion with DreamBooth LoRA.")
+    parser = argparse.ArgumentParser(description="Fine-tune Stable Diffusion with DreamBooth.")
     parser.add_argument("--pretrained_model_name_or_path", required=True, help="HF model id or local model path.")
     parser.add_argument("--revision", default=None, help="Optional model revision.")
     parser.add_argument("--variant", default=None, help="Optional model variant, for example fp16.")
@@ -62,6 +63,19 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--prior_loss_weight", type=float, default=1.0, help="Weight for prior preservation loss.")
     parser.add_argument("--num_class_images", type=int, default=100, help="Target number of generated class images.")
     parser.add_argument("--sample_batch_size", type=int, default=4, help="Batch size when generating class images.")
+    parser.add_argument(
+        "--use_lora",
+        dest="use_lora",
+        action="store_true",
+        default=True,
+        help="Train LoRA adapters on the UNet attention layers.",
+    )
+    parser.add_argument(
+        "--no_lora",
+        dest="use_lora",
+        action="store_false",
+        help="Fine-tune the full UNet instead of training LoRA adapters.",
+    )
 
     parser.add_argument("--resolution", type=int, default=512, help="Training image resolution.")
     parser.add_argument("--center_crop", action="store_true", help="Center crop instead of random crop.")
@@ -253,6 +267,27 @@ def save_lora_weights(unet: UNet2DConditionModel, output_dir: Path) -> None:
     )
 
 
+def save_full_pipeline(
+    unet: UNet2DConditionModel,
+    vae: AutoencoderKL,
+    text_encoder: CLIPTextModel,
+    tokenizer: CLIPTokenizer,
+    noise_scheduler: DDPMScheduler,
+    output_dir: Path,
+) -> None:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    pipeline = StableDiffusionPipeline(
+        vae=vae,
+        text_encoder=text_encoder,
+        tokenizer=tokenizer,
+        unet=unet,
+        scheduler=noise_scheduler,
+        safety_checker=None,
+        feature_extractor=None,
+    )
+    pipeline.save_pretrained(output_dir, safe_serialization=True)
+
+
 def main() -> None:
     args = parse_args()
     logging_dir = args.output_dir / "logs"
@@ -308,15 +343,16 @@ def main() -> None:
 
     freeze_parameters(vae.parameters())
     freeze_parameters(text_encoder.parameters())
-    freeze_parameters(unet.parameters())
 
-    unet_lora_config = LoraConfig(
-        r=args.rank,
-        lora_alpha=args.rank,
-        init_lora_weights="gaussian",
-        target_modules=["to_k", "to_q", "to_v", "to_out.0"],
-    )
-    unet.add_adapter(unet_lora_config)
+    if args.use_lora:
+        freeze_parameters(unet.parameters())
+        unet_lora_config = LoraConfig(
+            r=args.rank,
+            lora_alpha=args.rank,
+            init_lora_weights="gaussian",
+            target_modules=["to_k", "to_q", "to_v", "to_out.0"],
+        )
+        unet.add_adapter(unet_lora_config)
 
     if args.gradient_checkpointing:
         unet.enable_gradient_checkpointing()
@@ -376,11 +412,15 @@ def main() -> None:
         lr_scheduler,
     )
 
-    LOGGER.info("Training %d LoRA parameters.", sum(parameter.numel() for parameter in trainable_params))
+    LOGGER.info(
+        "Training %d %s parameters.",
+        sum(parameter.numel() for parameter in trainable_params),
+        "LoRA" if args.use_lora else "UNet",
+    )
     LOGGER.info(
         "Training setup: epochs=%d, max_train_steps=%d, updates_per_epoch=%d, batches_per_epoch=%d, "
         "dataset_size=%d, batch_size=%d, gradient_accumulation_steps=%d, learning_rate=%g, "
-        "with_prior_preservation=%s.",
+        "with_prior_preservation=%s, use_lora=%s.",
         args.num_train_epochs,
         args.max_train_steps,
         updates_per_epoch,
@@ -390,6 +430,7 @@ def main() -> None:
         args.gradient_accumulation_steps,
         args.learning_rate,
         args.with_prior_preservation,
+        args.use_lora,
     )
     global_step = 0
 
@@ -453,7 +494,13 @@ def main() -> None:
                 if args.checkpointing_steps and global_step % args.checkpointing_steps == 0:
                     if accelerator.is_main_process:
                         checkpoint_dir = args.output_dir / f"checkpoint-{global_step}"
-                        save_lora_weights(accelerator.unwrap_model(unet), checkpoint_dir)
+                        if args.use_lora:
+                            save_lora_weights(accelerator.unwrap_model(unet), checkpoint_dir)
+                        else:
+                            accelerator.unwrap_model(unet).save_pretrained(
+                                checkpoint_dir / "unet",
+                                safe_serialization=True,
+                            )
 
             if global_step >= args.max_train_steps:
                 break
@@ -477,8 +524,19 @@ def main() -> None:
 
     accelerator.wait_for_everyone()
     if accelerator.is_main_process:
-        save_lora_weights(accelerator.unwrap_model(unet), args.output_dir)
-        LOGGER.info("Saved LoRA weights to %s", args.output_dir)
+        if args.use_lora:
+            save_lora_weights(accelerator.unwrap_model(unet), args.output_dir)
+            LOGGER.info("Saved LoRA weights to %s", args.output_dir)
+        else:
+            save_full_pipeline(
+                accelerator.unwrap_model(unet),
+                vae,
+                text_encoder,
+                tokenizer,
+                noise_scheduler,
+                args.output_dir,
+            )
+            LOGGER.info("Saved full DreamBooth pipeline to %s", args.output_dir)
 
     accelerator.end_training()
 
