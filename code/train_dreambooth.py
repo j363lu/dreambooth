@@ -22,6 +22,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import itertools
+import logging
 import math
 from pathlib import Path
 from typing import Iterable
@@ -53,7 +54,7 @@ def parse_args() -> argparse.Namespace:
 
     parser.add_argument("--instance_data_dir", required=True, type=Path, help="Directory with subject images.")
     parser.add_argument("--class_data_dir", type=Path, default=None, help="Directory with class images for prior preservation.")
-    parser.add_argument("--output_dir", default="dreambooth-lora", type=Path, help="Where to save LoRA weights.")
+    parser.add_argument("--output_dir", default="lora-dreambooth-model", type=Path, help="Where to save LoRA weights.")
 
     parser.add_argument("--instance_prompt", required=True, help='Prompt with the unique token, e.g. "a sks dog".')
     parser.add_argument("--class_prompt", default=None, help='Class prompt, e.g. "a dog". Required with prior preservation.')
@@ -64,14 +65,14 @@ def parse_args() -> argparse.Namespace:
 
     parser.add_argument("--resolution", type=int, default=512, help="Training image resolution.")
     parser.add_argument("--center_crop", action="store_true", help="Center crop instead of random crop.")
-    parser.add_argument("--train_batch_size", type=int, default=1)
+    parser.add_argument("--train_batch_size", type=int, default=4)
     parser.add_argument("--num_train_epochs", type=int, default=1)
-    parser.add_argument("--max_train_steps", type=int, default=800)
+    parser.add_argument("--max_train_steps", type=int, default=None)
     parser.add_argument("--gradient_accumulation_steps", type=int, default=1)
     parser.add_argument("--gradient_checkpointing", action="store_true")
-    parser.add_argument("--learning_rate", type=float, default=1e-4)
+    parser.add_argument("--learning_rate", type=float, default=5e-4)
     parser.add_argument("--lr_scheduler", default="constant", choices=["linear", "cosine", "cosine_with_restarts", "polynomial", "constant", "constant_with_warmup"])
-    parser.add_argument("--lr_warmup_steps", type=int, default=0)
+    parser.add_argument("--lr_warmup_steps", type=int, default=500)
     parser.add_argument("--adam_beta1", type=float, default=0.9)
     parser.add_argument("--adam_beta2", type=float, default=0.999)
     parser.add_argument("--adam_weight_decay", type=float, default=1e-2)
@@ -79,11 +80,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max_grad_norm", type=float, default=1.0)
 
     parser.add_argument("--rank", type=int, default=4, help="LoRA rank.")
-    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--seed", type=int, default=None)
     parser.add_argument("--mixed_precision", choices=["no", "fp16", "bf16"], default=None)
     parser.add_argument("--allow_tf32", action="store_true")
     parser.add_argument("--dataloader_num_workers", type=int, default=0)
-    parser.add_argument("--checkpointing_steps", type=int, default=0, help="Save LoRA weights every N steps; 0 disables.")
+    parser.add_argument("--checkpointing_steps", type=int, default=500, help="Save LoRA weights every N steps; 0 disables.")
 
     args = parser.parse_args()
 
@@ -261,6 +262,11 @@ def main() -> None:
         mixed_precision=args.mixed_precision,
         project_config=accelerator_project_config,
     )
+    logging.basicConfig(
+        format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
+        datefmt="%m/%d/%Y %H:%M:%S",
+        level=logging.INFO,
+    )
 
     if args.seed is not None:
         set_seed(args.seed)
@@ -371,10 +377,25 @@ def main() -> None:
     )
 
     LOGGER.info("Training %d LoRA parameters.", sum(parameter.numel() for parameter in trainable_params))
+    LOGGER.info(
+        "Training setup: epochs=%d, max_train_steps=%d, updates_per_epoch=%d, batches_per_epoch=%d, "
+        "dataset_size=%d, batch_size=%d, gradient_accumulation_steps=%d, learning_rate=%g, "
+        "with_prior_preservation=%s.",
+        args.num_train_epochs,
+        args.max_train_steps,
+        updates_per_epoch,
+        len(train_dataloader),
+        len(train_dataset),
+        args.train_batch_size,
+        args.gradient_accumulation_steps,
+        args.learning_rate,
+        args.with_prior_preservation,
+    )
     global_step = 0
 
     for epoch in range(args.num_train_epochs):
         unet.train()
+        LOGGER.info("Starting epoch %d/%d at global step %d.", epoch + 1, args.num_train_epochs, global_step)
         for step, batch in enumerate(train_dataloader):
             with accelerator.accumulate(unet):
                 latents = vae.encode(batch["pixel_values"].to(dtype=weight_dtype)).latent_dist.sample()
@@ -438,7 +459,21 @@ def main() -> None:
                 break
 
         if global_step >= args.max_train_steps:
+            LOGGER.info(
+                "Finished epoch %d/%d at global step %d/%d; reached max_train_steps.",
+                epoch + 1,
+                args.num_train_epochs,
+                global_step,
+                args.max_train_steps,
+            )
             break
+        LOGGER.info(
+            "Finished epoch %d/%d at global step %d/%d.",
+            epoch + 1,
+            args.num_train_epochs,
+            global_step,
+            args.max_train_steps,
+        )
 
     accelerator.wait_for_everyone()
     if accelerator.is_main_process:
