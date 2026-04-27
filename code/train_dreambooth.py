@@ -3,12 +3,12 @@
 Example:
     accelerate launch code/train_dreambooth.py \
         --pretrained_model_name_or_path runwayml/stable-diffusion-v1-5 \
-        --instance_data_dir data/dog \
-        --class_data_dir data/class_dog \
-        --instance_prompt "a sks dog" \
-        --class_prompt "a dog" \
+        --instance_data_dir data/dreambooth_original/cat2 \
+        --class_data_dir data/generated/cat-stable-diffusion-1_5 \
+        --instance_prompt "a sks cat" \
+        --class_prompt "a cat" \
         --with_prior_preservation \
-        --output_dir outputs/dog_lora
+        --output_dir outputs/cat_lora
 
 This script follows the DreamBooth objective:
     loss = reconstruction_loss + prior_loss_weight * prior_preservation_loss

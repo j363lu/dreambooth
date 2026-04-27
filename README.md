@@ -22,8 +22,8 @@ Run training with `accelerate`:
 ```bash
 accelerate launch code/train_dreambooth.py \
   --pretrained_model_name_or_path runwayml/stable-diffusion-v1-5 \
-  --instance_data_dir data/cat2 \
-  --class_data_dir data/class_cat \
+  --instance_data_dir data/dreambooth_original/cat2 \
+  --class_data_dir data/generated/cat-stable-diffusion-1_5 \
   --instance_prompt "a sks cat" \
   --class_prompt "a cat" \
   --with_prior_preservation \
@@ -33,7 +33,7 @@ accelerate launch code/train_dreambooth.py \
 ```
 
 `instance_data_dir` should point to the specific subject images, such as
-`data/cat2`. These images are trained with the instance prompt, such as
+`data/dreambooth_original/cat2`. These images are trained with the instance prompt, such as
 `"a sks cat"`, and contribute the reconstruction loss.
 
 `class_data_dir` should point to generic images from the same class, such as
