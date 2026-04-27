@@ -81,7 +81,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--center_crop", action="store_true", help="Center crop instead of random crop.")
     parser.add_argument("--train_batch_size", type=int, default=4)
     parser.add_argument("--num_train_epochs", type=int, default=1)
-    parser.add_argument("--max_train_steps", type=int, default=None)
+    parser.add_argument("--max_train_steps", type=int, default=800)
     parser.add_argument("--gradient_accumulation_steps", type=int, default=1)
     parser.add_argument("--gradient_checkpointing", action="store_true")
     parser.add_argument("--learning_rate", type=float, default=5e-4)
