@@ -79,12 +79,12 @@ def parse_args() -> argparse.Namespace:
 
     parser.add_argument("--resolution", type=int, default=512, help="Training image resolution.")
     parser.add_argument("--center_crop", action="store_true", help="Center crop instead of random crop.")
-    parser.add_argument("--train_batch_size", type=int, default=4)
+    parser.add_argument("--train_batch_size", type=int, default=1)
     parser.add_argument("--num_train_epochs", type=int, default=1)
-    parser.add_argument("--max_train_steps", type=int, default=800)
-    parser.add_argument("--gradient_accumulation_steps", type=int, default=1)
+    parser.add_argument("--max_train_steps", type=int, default=200)
+    parser.add_argument("--gradient_accumulation_steps", type=int, default=4)
     parser.add_argument("--gradient_checkpointing", action="store_true")
-    parser.add_argument("--learning_rate", type=float, default=5e-4)
+    parser.add_argument("--learning_rate", type=float, default=1e-4)
     parser.add_argument("--lr_scheduler", default="constant", choices=["linear", "cosine", "cosine_with_restarts", "polynomial", "constant", "constant_with_warmup"])
     parser.add_argument("--lr_warmup_steps", type=int, default=500)
     parser.add_argument("--adam_beta1", type=float, default=0.9)
@@ -98,7 +98,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--mixed_precision", choices=["no", "fp16", "bf16"], default=None)
     parser.add_argument("--allow_tf32", action="store_true")
     parser.add_argument("--dataloader_num_workers", type=int, default=0)
-    parser.add_argument("--checkpointing_steps", type=int, default=500, help="Save LoRA weights every N steps; 0 disables.")
+    parser.add_argument("--checkpointing_steps", type=int, default=50, help="Save LoRA weights every N steps; 0 disables.")
 
     args = parser.parse_args()
 
