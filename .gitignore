@@ -2,3 +2,6 @@ __pycache__/
 *.py[cod]
 *$py.class
 outputs/
+
+# anything named tmp
+*tmp*
