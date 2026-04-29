@@ -43,3 +43,25 @@ model using `--class_prompt`. These images contribute the prior preservation
 loss, which helps the model keep the general meaning of prompts like `"a cat"`.
 
 The script saves LoRA weights to `--output_dir`.
+
+## Evaluating Generated Images
+
+The evaluation entry point is `code/eval.py`. It evaluates generated images using CLIP-I, CLIP-T, and DINO similarity metrics to assess image quality and fidelity.
+
+Run evaluation with default parameters (uses `data/dreambooth_original/cat2` as reference and `results/cat2` as generated images, derives prompts from filenames):
+
+```bash
+python code/eval.py
+```
+
+For custom directories and prompts:
+
+```bash
+python code/eval.py \
+  --reference_dir path/to/reference/images \
+  --generated_dir path/to/generated/images \
+  --prompts_file path/to/prompts.txt \
+  --output_dir path/to/output
+```
+
+The script computes CLIP-I (image-to-reference similarity), CLIP-T (image-to-text similarity), and DINO (feature similarity) scores. Results are saved as a JSON file in the output directory with a timestamped filename, e.g., `eval_log_20260428_143022.json`.
