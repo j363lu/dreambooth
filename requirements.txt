@@ -4,4 +4,7 @@ diffusers
 transformers
 safetensors
 torchao>=0.17.0
+torch
 torchvision
+Pillow
+tqdm
