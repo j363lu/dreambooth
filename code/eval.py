@@ -21,16 +21,25 @@ logger.setLevel(logging.INFO)
 def parse_args():
     parser = argparse.ArgumentParser(description="Evaluate generated images from a DreamBooth-like model using CLIP-I, CLIP-T, and DINO metrics.")
     parser.add_argument(
+        "-r",
         "--reference_dir",
         type=str,
         default="data/dreambooth_original/cat2",
-        help="Directory containing the reference images.",
+        help="Directory containing the reference images. Ignored when --dataset is provided.",
     )
     parser.add_argument(
+        "-g",
         "--generated_dir",
         type=str,
         default="results/cat2",
-        help="Directory containing the generated images.",
+        help="Directory containing the generated images. Ignored when --dataset is provided.",
+    )
+    parser.add_argument(
+        "-d",
+        "--dataset",
+        type=str,
+        default=None,
+        help="Dataset name. When provided, reference and generated directories are automatically set to data/dreambooth_original/<dataset> and results/<dataset>.",
     )
     parser.add_argument(
         "--prompts_file",
@@ -41,8 +50,8 @@ def parse_args():
     parser.add_argument(
         "--output_dir",
         type=str,
-        default="results",
-        help="Directory where metric files will be written.",
+        default=None,
+        help="Directory where metric files will be written. Defaults to results/metrics/<generated_dir_name> when not provided.",
     )
     parser.add_argument(
         "--device",
@@ -238,9 +247,18 @@ def main():
     args = parse_args()
     device = resolve_device(args.device)
 
-    reference_dir = Path(args.reference_dir).expanduser()
-    generated_dir = Path(args.generated_dir).expanduser()
-    output_dir = Path(args.output_dir).expanduser()
+    if args.dataset is not None:
+        reference_dir = Path("data") / "dreambooth_original" / Path(args.dataset)
+        generated_dir = Path("results") / Path(args.dataset)
+        logger.info("Using dataset %s: reference=%s generated=%s", args.dataset, reference_dir, generated_dir)
+    else:
+        reference_dir = Path(args.reference_dir).expanduser()
+        generated_dir = Path(args.generated_dir).expanduser()
+
+    if args.output_dir is None:
+        output_dir = Path("results") / "metrics" / generated_dir.name
+    else:
+        output_dir = Path(args.output_dir).expanduser()
 
     if not reference_dir.exists():
         raise FileNotFoundError(f"The reference directory does not exist: {reference_dir}")
