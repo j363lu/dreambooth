@@ -54,14 +54,31 @@ Run evaluation with default parameters (uses `data/dreambooth_original/cat2` as 
 python code/eval.py
 ```
 
+Use the simplified dataset option to evaluate a named dataset from the repository structure:
+
+```bash
+python code/eval.py --dataset cat2
+```
+
+This sets:
+- reference images: `data/dreambooth_original/<dataset>`
+- generated images: `results/<dataset>`
+
+Short options are also supported:
+- `-r` / `--reference_dir`
+- `-g` / `--generated_dir`
+- `-d` / `--dataset`
+
 For custom directories and prompts:
 
 ```bash
 python code/eval.py \
-  --reference_dir path/to/reference/images \
-  --generated_dir path/to/generated/images \
+  -r path/to/reference/images \
+  -g path/to/generated/images \
   --prompts_file path/to/prompts.txt \
   --output_dir path/to/output
 ```
+
+When `--output_dir` is omitted, the script saves metric files by default to `results/metrics/<generated_dir_name>`.
 
 The script computes CLIP-I (image-to-reference similarity), CLIP-T (image-to-text similarity), and DINO (feature similarity) scores. Results are saved as a JSON file in the output directory with a timestamped filename, e.g., `eval_log_20260428_143022.json`.
