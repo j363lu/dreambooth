@@ -40,3 +40,19 @@ subject outfit.
 prompt `"a robot toy"`. With prior preservation, the model can generate general
 and diverse robot toy results. Without prior preservation, the model tends to
 generate the fine-tuned instance.
+
+## Quantitative Metrics
+
+![DreamBooth metric comparison](metrics.png)
+
+`metrics.png` compares the reported DreamBooth baseline metrics with our
+reproduction results on DINO, CLIP-I, and CLIP-T.
+
+- **DINO** measures image-to-image similarity using self-supervised visual
+  features. Higher DINO scores indicate that generated images better preserve
+  the visual identity and structure of the reference subject.
+- **CLIP-I** measures image-to-image similarity in CLIP embedding space. Higher
+  CLIP-I scores indicate stronger visual alignment between the generated images
+  and the subject reference images.
+- **CLIP-T** measures image-to-text similarity in CLIP embedding space. Higher
+  CLIP-T scores indicate that generated images better match the text prompts.
