@@ -2,13 +2,13 @@
 
 ![DreamBooth generated examples](results/dreambooth.png)
 
-CS 5782 final project reproducing
+## Introduction
+
+This repository reproduces
 [DreamBooth: Fine Tuning Text-to-Image Diffusion Models for Subject-Driven Generation](https://arxiv.org/abs/2208.12242).
 This repository fine-tunes Stable Diffusion on a small set of subject images,
 generates subject-driven images from the adapted model, and evaluates the
 outputs with DINO, CLIP-I, and CLIP-T similarity metrics.
-
-## Overview
 
 DreamBooth adapts a text-to-image diffusion model to a specific subject using a
 small number of reference images and a unique identifier token. This
@@ -22,7 +22,13 @@ The reconstruction loss teaches the model the target subject, while the prior
 preservation loss helps retain the general class concept, such as `cat`,
 `dog`, or `toy`.
 
-## Repository Layout
+## Chosen Result
+
+We intend to reproduce the fine-tuning pipeline in the paper, fine-tune a few models to generate some visual results, and implement the metrics in the table below. Since Imagen is a closed-source model, we only fine-tune on stable diffusion models.
+
+![Chosen Result](results/chosen_results.png)
+
+## GitHub Contents
 
 ```text
 code/
@@ -33,13 +39,25 @@ data/
   dreambooth_original/      Official DreamBooth subject images
   generated/                Generated class images for prior preservation
   our_data/                 Custom subject images collected for this project
+poster/                     Project poster
+report/                     Project report
 results/                    Generated examples, comparisons, and metrics
 ```
 
-See `data/README.md` for dataset details and `results/README.md` for qualitative
-examples and quantitative metric comparisons.
+## Re-implementation Details
 
-## Setup
+We re-implement DreamBooth by fine-tuning Stable Diffusion v1.5 with the
+original DreamBooth subject images and our own collected subjects. Training uses
+the Hugging Face Diffusers and Accelerate tooling with prior preservation class
+images generated for each subject. Since Imagen is not publicly available, we
+use Stable Diffusion as the base text-to-image model while keeping the
+DreamBooth objective and prompt format. Evaluation follows the paper's subject fidelity and prompt alignment goals using DINO, CLIP-I, and CLIP-T similarity metrics.
+
+## Reproduction Steps
+
+### Setup
+
+A GPU like T4 or better is recommended for the project.
 
 Install the required Python packages:
 
@@ -55,7 +73,7 @@ runwayml/stable-diffusion-v1-5
 
 GPU acceleration is strongly recommended for training.
 
-## Training
+### Training
 
 The training entry point is `code/train_dreambooth.py`. A typical run with prior
 preservation is:
@@ -100,7 +118,7 @@ python code/inference_dreambooth.py \
 The script supports LoRA checkpoints, full Stable Diffusion pipelines, and UNet
 checkpoints through `--checkpoint_type`.
 
-## Evaluation
+### Evaluation
 
 The evaluation entry point is `code/eval.py`. It compares generated images with
 reference images and prompts using:
@@ -151,7 +169,7 @@ Evaluation logs are written as timestamped JSON files, for example
 
 The `results/` directory contains generated image grids, prior-preservation
 comparisons, and a metric comparison between reported DreamBooth baselines and
-this reproduction. See `results/README.md` for the full result summary.
+this reproduction.
 
 ### Expression Modification
 
@@ -176,3 +194,22 @@ this reproduction. See `results/README.md` for the full result summary.
 ### Quantitative Metrics
 
 ![DreamBooth metric comparison](results/metrics.png)
+
+## Conclusion
+
+This re-implementation shows that DreamBooth can be reproduced with open-source
+Stable Diffusion checkpoints while preserving the core training objective and
+subject-driven generation behavior. The main lessons were that diffusion models can learn to generate a specific subject by finetuning on a few images, and prior preservation is important for reducing overfitting. The largest practical challenge was hyperparameter tuning since the original paper does not specify the training details.
+
+## Acknowledgements
+
+This project was completed as part of coursework for CS5782 at Cornell
+University. We acknowledge the original DreamBooth authors for their method,
+paper, and released subject datasets, as well as the open-source Stable
+Diffusion, Diffusers, Accelerate, CLIP, and DINO communities whose tools made
+this reproduction possible.
+
+## References
+
+Ruiz et al., "DreamBooth: Fine Tuning Text-to-Image Diffusion Models for
+Subject-Driven Generation." [arXiv:2208.12242](https://arxiv.org/abs/2208.12242)
